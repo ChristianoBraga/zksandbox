@@ -1,0 +1,3 @@
+!(def query (lambda (x) (secret test) (test secret)))
+
+!(commit query)

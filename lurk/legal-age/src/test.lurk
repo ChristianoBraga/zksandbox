@@ -1,0 +1,3 @@
+!(def test (lambda (x) (> 17 x)))
+
+!(commit test)
