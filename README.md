@@ -1,5 +1,4 @@
-# Z e r o  K n o w l e d g e  
-   _Sandbox_ 
+# Z e r o  K n o w l e d g e _Sandbox_ 
 
 The objective of this project is to help disseminate zero knowledge
 technology. At first, examples of the application of ZK technology
