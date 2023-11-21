@@ -174,31 +174,17 @@ class LurkWrapper:
             print(e)
             raise LurkWrapperCommException('Inspect failed.')
         
-def _load_env(p):
-    env = { 'prover' :   {'commits' : [], 'proof_keys' : [] },
-            'verifier' : {'commits' : [], 'proof_keys' : [] },
-            'public' :   {'commits' : [], 'proof_keys' : [] }}
-    return env
-        
-def _config():
-    if (not os.path.exists('./.zksim')):
-        print('zksim configuration folder (./.zksim) does not exist. Creating it...')
-        try:
-            os.makedirs('./.zksim/commits/prover')
-            os.makedirs('./.zksim/proofs/prover')
-            os.makedirs('./.zksim/commits/verifier')
-            os.makedirs('./.zksim/proofs/verifier')
-            f = open('.zksim/.zksim_history','w')
-            f.close()
-        except Exception as e:
-            print(e)
-            print('Error while creating configuration folders under ./.zksim.')
-    else:
-        env = _load_env('./.zksim')
-    return env, './.zksim/.zksim_history', './.zksim/commits', './.zksim/proofs'
+def _handle_call(zksim_env, test, value):
+    try:
+        cd, pd = zksim_env._get_party_dirs()
+        lurkw = LurkWrapper(f'{cd}', f'{pd}')
+        out = lurkw.apply(test, value)
+        print(out)
+    except Exception as e:
+        print(e)
+        print(f'Error while executing Call.')
 
-def _handle_hide(zksim_env, party, value, cd, pd):
-    assert(party == 'public' or party == 'prover' or party == 'verifier')
+def _handle_hide(zksim_env, party, value)
     assert(type(value) == list)
     if party != 'public':
         try:
@@ -215,25 +201,40 @@ def _handle_hide(zksim_env, party, value, cd, pd):
                 return None
             value_str = ' '.join(value)
             print(f'Value {value_str} hidden as {secret}.')
+            return secret
         except Exception as e:
             print(e)
             print('Error while executing hide.')
     else:
         print('Public can\'t hide.')
+        return None
+
+def _handle_party(zksim_env, party, value):
+    assert(type(value) == list)
+    cd = f'zksim_env[\'zksim_dir\']/commits'
+    if party == 'public':
+        try:
+            lurkw = LurkWrapper(f"{cd}/public", f"{pd}/public")
+            rc, secret = lurkw.hide(value)
+            if rc > 0:
+                print('Hide failed.')
+                return None
+            if secret not in zksim_env[party]['commits'] and \
+               secret not in zksim_env['public']['commits']:
+                zksim_env[party]['commits'].append(secret)
+            else:
+                print('Secret {secret} already created.')
+                return None
+            value_str = ' '.join(value)
+            print(f'Value {value_str} hidden as {secret}.')
+        except Exception as e:
+            print(e)
+            print('Error while executing hide.')
+    else:
+        print('Only Public can Party.')
     return secret
-    
-def _handle_apply(zksim_env, party, test, value, cd, pd):
-    assert(party == 'public' or party == 'prover' or party == 'verifier')
-    try:
-        lurkw = LurkWrapper(f"{cd}/{party}", f"{pd}/{party}")
-        out = lurkw.apply(test, value)
-        print(out)
-    except Exception as e:
-        print(e)
-        print(f'Error while executing Apply.')
 
 def _handle_prove(zksim_env, party, test, value, cd, pd):
-    assert(party == 'public' or party == 'prover' or party == 'verifier')
     if party != 'public':
         try:
             lurkw = LurkWrapper(f"{cd}/{party}", f"{pd}/{party}")
@@ -251,7 +252,6 @@ def _handle_prove(zksim_env, party, test, value, cd, pd):
         print('Public can\'t prove.')
 
 def _handle_verify(zksim_env, party, proof_key, cd, pd):
-    assert(party == 'public' or party == 'prover' or party == 'verifier')
     try:
         lurkw = LurkWrapper(f"{cd}/{party}", f"{pd}/{party}")
         out = lurkw.verify(proof_key)
@@ -261,7 +261,6 @@ def _handle_verify(zksim_env, party, proof_key, cd, pd):
         print(f'Error while executing Verify.')
 
 def _handle_inspect(zksim_env, party, proof_key, test, value, output, cd, pd):
-    assert(party == 'public' or party == 'prover' or party == 'verifier')
     try:
         lurkw = LurkWrapper(f"{cd}/{party}", f"{pd}/{party}")
         out = lurkw.inspect(proof_key, test, value, output)
@@ -299,49 +298,83 @@ def _handle_env(zksim_env, party):
             for e in zksim_env[party][k]:
                 print(f'{e} ', end='')
                 print()
-                
-def _main(zksim_env, history_file, commits_dir, proofs_dir):
-    cmd = None
-    zksim_completer = pt.completion.WordCompleter(
-        ['apply', 'call', 'check', 'disclose', 'disclosed', 'env', 'exit', 
-         'hide', 'prove', 'prover', 'public', 'verify', 'verifier'], ignore_case=True)
-    party = 'prover'
-    last_secret = None
-    last_proof = None
-    cd = commits_dir
-    pd = proofs_dir
-    session = pt.PromptSession(history=pt.history.FileHistory(history_file))
+
+class ZKSimEnv:
+    _COMMITS_DIR = 'commits'
+    _PROOFS_DIR  = 'proofs'
+    def __init__(self, dir):
+        self._dir     = dir
+        self._hist    = f'{dir}/.zksim_history'
+        self._party = 'public'
+        self._parties = []
+        if not os.path.exists(f'{self._dir}'):
+            os.makedirs(f'{self._dir}')
+        if not os.path.isfile(f'{self._dir}/{self._hist}'):
+            f = open(f'{self._dir}/{self._hist}','a')
+            f.close()
+        self.add_party('public')
+
+    def _add_party(self, p):
+        if (not os.path.exists(f'{self._dir}/{p}')):
+            os.makedirs(f'{self._dir}/{p}/{ZKSimEnv._COMMITS_DIR}')
+            os.makedirs(f'{self._dir}/{p}/{ZKSimEnv._PROOFS_DIR}')
+        self._parties.append(p)
+
+    def _get_party(self):
+        return self._party
+    
+    def _get_hist(self):
+        return self._hist
+    
+    def _get_party_dirs(self):
+        return f'{self._dir}/{self._party}/{ZKSimEnv._COMMITS_DIR}', \
+               f'{self._dir}/{self._party}/{ZKSimEnv._PROOFS_DIR }'
+
+class ZKSimPrompt:
+    def __init__(self, hist):
+        self.completer = pt.completion.WordCompleter(
+            ['call', 'check', 'disclose', 'disclosed', 'env', 'exit', 'help',
+             'hide', 'party', 'prove', 'public', 'verify'], ignore_case=True)
+        self.session = pt.PromptSession(history=pt.history.FileHistory(hist))
+
+    def prompt(self, party):
+        return self.session.prompt('zksim ❯ ', completer=self.completer, rprompt=party)
+    
+def _main(path):
+    zksim_env    = ZKSimEnv(path)
+    zksim_prompt = ZKSimPrompt(zksim_env.get_hist())
+    last_secret  = None
+    last_proof   = None
+    cmd          = None
     while True:
         try:
-            cmd = session.prompt('zksim ❯ ', completer=zksim_completer, rprompt=party)
+            cmd = zksim_prompt.prompt(zksim_env.get_party())
             match cmd.split():
-                case ['prover']:
-                    party = 'prover'
-                case ['verifier']:
-                    party = 'verifier'
-                case ['public']:
-                    party = 'public'
+                case ['call', test, value]:
+                    _handle_call(zksim_env, test, value)
+                case ['check', 'call', test, value, 'returns',  output, 'in', proof_key]:
+                    _handle_inspect(zksim_env, proof_key, test, value, output)
                 case ['disclose']:
-                    last_secret, last_proof = _handle_disclose(zksim_env, party, last_secret, last_proof)
+                    last_secret, last_proof = _handle_disclose(zksim_env, last_secret, last_proof)
                 case ['disclosed']:
                     _handle_disclosed(zksim_env)
                 case ['env']:
-                    _handle_env(zksim_env, party)
-                case ['hide', *value]:
-                    last_secret = _handle_hide(zksim_env, party, value, cd, pd)
-                case ['call', test, value]:
-                    _handle_apply(zksim_env, party, test, value, cd, pd)
-                case ['apply', test, value]:
-                    _handle_apply(zksim_env, party, test, value, cd, pd)
-                case ['prove', test, value]:
-                    last_proof = _handle_prove(zksim_env, party, test, value, cd, pd)
-                case ['verify', proof_key]:
-                    _handle_verify(zksim_env, party, proof_key, cd, pd)
-                case ['check', 'call', test, value, 'reducing', 'to', output, 'in', proof_key]:
-                    _handle_inspect(zksim_env, party, proof_key, test, value, output, cd, pd)
+                    _handle_env(zksim_env)
                 case ['exit']:
                     print('Bye')
                     break
+                case ['help']:
+                    print('To be written...')
+                case ['hide', *value]:
+                    last_secret = _handle_hide(zksim_env, value)
+                case ['party', *value]:
+                    zksim_env._add_party(_handle_party(zksim_env, value))
+                case ['prove', test, value]:
+                    last_proof = _handle_prove(zksim_env, test, value)
+                case ['public']:
+                    party = 'public'
+                case ['verify', proof_key]:
+                    _handle_verify(zksim_env, proof_key)
                 case other:
                     print(f'Unknown command {other}.')
         except KeyboardInterrupt:
@@ -350,14 +383,14 @@ def _main(zksim_env, history_file, commits_dir, proofs_dir):
         except EOFError:
             print('\nBye')
             break
-    
+
 if __name__ == '__main__':
     try:
+        os.system('clear')
         print('Z K  P r o t o c o l Simulator')
         print('Powered by Lurk')
         print()
-        env, hf, cd, pd = _config()
-        _main(env, hf, cd, pd)
+        _main('./.zksim')
     except Exception as e:
         print(e)
         print(type(e))
