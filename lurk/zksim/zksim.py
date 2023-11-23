@@ -19,11 +19,12 @@ class LurkWrapperCommException(Exception):
     pass
 
 class LurkWrapper:
-    def __init__(self, cd, pd):
+    def __init__(self, timeout, cd, pd):
         lurk_path = sh.which('lurk')
         if lurk_path == None:
             raise LurkWrapperCmdException('Lurk is not installed.')
-        self.lurk_cmd = [lurk_path, f'--commits-dir={cd}', f"--proofs-dir={pd}"]
+        self._timeout = timeout
+        self._lurk_cmd = [lurk_path, f'--commits-dir={cd}', f"--proofs-dir={pd}"]
 
     def _mk_hide_cmd(salt, value):
         '''
@@ -105,18 +106,18 @@ class LurkWrapper:
     def _run(self, cmd, cmd_list):
         try:
             echo_p = sp.Popen(["echo"] + cmd_list, stdout=sp.PIPE)
-            lurk_p = sp.Popen(self.lurk_cmd, stdin=echo_p.stdout, stdout=sp.PIPE, stderr=sp.PIPE)
+            lurk_p = sp.Popen(self._lurk_cmd, stdin=echo_p.stdout, stdout=sp.PIPE, stderr=sp.PIPE)
             echo_p.stdout.close()
             # Executes echo <cmd> | lurk
             # For example: echo !(hide 123 53) | lurk
-            comm_out = lurk_p.communicate(timeout=5)
+            comm_out = lurk_p.communicate(timeout=self._timeout)
             if lurk_p.returncode < 0:
                 raise LurkWrapperCommException(f'{cmd} failed.')
             else:
                 return (comm_out[0]).decode('utf-8') + (comm_out[1]).decode('utf-8')
         except Exception as e:
             print(e)
-            raise LurkWrapperCommException('{cmd} failed.')
+            raise LurkWrapperCommException(f'{cmd} failed.')
         
     def hide(self, value):
         salt = rand.randint(10_000_000_000, 100_000_000_000)
@@ -187,7 +188,7 @@ def _handle_call(zksim_env, test, value):
     assert(type(value) != list)
     try:
         cd, pd = zksim_env._get_party_dirs()
-        lurkw = LurkWrapper(cd, pd)
+        lurkw = LurkWrapper(zksim_env.timeout, cd, pd)
         out = lurkw.call('0x'+test, '0x'+value)
         print(out)
     except Exception as e:
@@ -199,7 +200,7 @@ def _handle_hide(zksim_env, value):
     if not zksim_env._is_public():
         try:
             cd, pd = zksim_env._get_party_dirs()
-            lurkw = LurkWrapper(cd, pd)
+            lurkw = LurkWrapper(zksim_env.timeout, cd, pd)
             rc, out = lurkw.hide(value)
             if rc > 0:
                 print(out)
@@ -215,6 +216,9 @@ def _handle_hide(zksim_env, value):
     else:
         print('Public can\'t hide.')
         return None
+
+def _handle_parties(zksim_env):
+    return zksim_env._get_parties()
 
 def _handle_party(zksim_env, hash):
     current_party = zksim_env._get_party()  
@@ -233,7 +237,7 @@ def _handle_new_party(zksim_env, value):
     if zksim_env._is_public():
         try:
             cd, pd = zksim_env._get_party_dirs()
-            lurkw = LurkWrapper(cd, pd)
+            lurkw = LurkWrapper(zksim_env.timeout, cd, pd)
             rc, out = lurkw.hide(value)
             if rc > 0:
                 print(out)
@@ -252,7 +256,7 @@ def _handle_prove(zksim_env, test, value):
     if not zksim_env._is_public():
         try:
             cd, pd = zksim_env._get_party_dirs()
-            lurkw = LurkWrapper(cd, pd)
+            lurkw = LurkWrapper(zksim_env.timeout, cd, pd)
             rc, out = lurkw.prove('0x'+test, '0x'+value)
             key = None
             if rc > 0:
@@ -271,7 +275,7 @@ def _handle_prove(zksim_env, test, value):
 def _handle_verify(zksim_env, proof_key):
     try:
         cd, pd = zksim_env._get_party_dirs()
-        lurkw = LurkWrapper(cd, pd)
+        lurkw = LurkWrapper(zksim_env.timeout, cd, pd)
         out = lurkw.verify(proof_key)
         print(out)
     except Exception as e:
@@ -281,7 +285,7 @@ def _handle_verify(zksim_env, proof_key):
 def _handle_inspect(zksim_env, proof_key, test, value, output):
     try:
         cd, pd = zksim_env._get_party_dirs()
-        lurkw = LurkWrapper(cd, pd)
+        lurkw = LurkWrapper(zksim_env.timeout, cd, pd)
         rc, out = lurkw.inspect('\"'+proof_key+'\"', '0x'+test, '0x'+value, output)       
         print(out)
         if rc > 0:
@@ -357,10 +361,11 @@ class ZKSimEnv:
     A commit or proof is not represented in memory. Any computation that
     requires either one must query the filesystem for it.
     '''
-    def __init__(self, dir):
+    def __init__(self, dir, timeout=15):
         self._dir     = dir
         self._hist    = f'{dir}/.zksim_history'
         self._party = 'public'
+        self.timeout = timeout
         if not os.path.exists(self._dir):
             os.makedirs(self._dir)
         if not os.path.isfile(self._hist):
@@ -521,6 +526,8 @@ def _main(path):
                     print('To be written...')
                 case ['hide', *value]:
                     last_secret = _handle_hide(zksim_env, value)
+                case [parties]:
+                    _handle_parties(zksim_env)
                 case ['party', hash]:
                     _handle_party(zksim_env, hash)
                 case ['new', 'party', *value]:
