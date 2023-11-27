@@ -218,7 +218,11 @@ def _handle_hide(zksim_env, value):
         return None
 
 def _handle_parties(zksim_env):
-    return zksim_env._get_parties()
+    parties = zksim_env._get_parties()
+    if parties != []:
+        print('Parties:')
+        parties.sort()
+        [print(p) for p in parties]
 
 def _handle_party(zksim_env, hash):
     current_party = zksim_env._get_party()  
@@ -526,7 +530,7 @@ def _main(path):
                     print('To be written...')
                 case ['hide', *value]:
                     last_secret = _handle_hide(zksim_env, value)
-                case [parties]:
+                case ['parties']:
                     _handle_parties(zksim_env)
                 case ['party', hash]:
                     _handle_party(zksim_env, hash)
