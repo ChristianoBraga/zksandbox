@@ -21,9 +21,24 @@ class ZeekPrompt:
         return self.session.prompt('zeek ❯ ', rprompt=self._zeek_env.get_party())
 
     def handle_call(self, test, value):
+        '''
+        A call executes the application of test to value.
+        Both commits should be desclosed to the current party, either
+        because they were hidden by the current party itself or they were
+        sent from another party to the current party.
+        '''
         assert(type(value) != list)
+        if self._zeek_env.get_party() == None:
+            print('Run command party first to set current party.')
+            return
+        if not self._zeek_env.is_commited_by_current_party(test):
+            print(f'Secret {test} was not hiden nor sent to {self._zeek_env.get_party()}.')
+            return
+        if not self._zeek_env.is_commited_by_current_party(value):
+            print(f'Secret {value} was not hiden nor sent to {self._zeek_env.get_party()}.')
+            return            
         try:
-            cd, pd = self._zeek_env.get_dirs()
+            cd, pd = self._zeek_env.get_current_party_dirs()
             lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
             out = lurkw.call('0x'+test, '0x'+value)
             print(out)
@@ -33,32 +48,28 @@ class ZeekPrompt:
 
     def handle_hide(self, value):
         assert(type(value) == list)
-        if not self._zeek_env.is_public():
-            try:
-                cd, pd = self._zeek_env.get_dirs()
-                lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
-                rc, out = lurkw.hide(value)
-                if rc > 0:
-                    print(out)
-                    print('Hide failed.')
-                    return None
-                else:
-                    value_str = ' '.join(value)
-                    print(f'Value {value_str} hidden as {out}')
-                    return out
-            except Exception as e:
-                print(e)
-                print('Unexpected error while executing hide.')
-        else:
-            print('Public can\'t hide.')
-            return None
-
+        try:
+            cd, pd = self._zeek_env.get_current_party_dirs()
+            lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
+            rc, out = lurkw.hide(value)
+            if rc > 0:
+                print(out)
+                print('Hide failed.')
+                return None
+            else:
+                value_str = ' '.join(value)
+                print(f'Value {value_str} hidden as {out}')
+                return out
+        except Exception as e:
+            print(e)
+            print('Unexpected error while executing hide.')
+    
     def handle_parties(self):
         parties = self._zeek_env.get_parties()
         if parties != []:
             print('Parties:')
             parties.sort()
-            [print(p) for p in parties]
+            [print(f'\t{p}') for p in parties]
 
     def handle_party(self, hash):
         current_party = self._zeek_env.get_party()  
@@ -71,50 +82,43 @@ class ZeekPrompt:
                 print(f'Party {hash} does not exist.\nParty is still {self._zeek_env.get_party()}.')
                 print('Party failed.')
 
-
     def handle_new_party(self, value):
         assert(type(value) == list)
-        if self._zeek_env.is_public():
-            try:
-                cd, pd = self._zeek_env.get_dirs()
-                lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
-                rc, out = lurkw.hide(value)
-                if rc > 0:
-                    print(out)
-                    print('New party failed.')
-                else:
-                    self._zeek_env.add_party(out)            
-                    value_str = ' '.join(value)    
-                    print(f'Party {out} created for {value_str}.')
-            except Exception as e:
-                print(e)
-                print('Unexpected error while executing New party.')
-        else:
-            print('Only Public can Party.')
+        try:
+            cd, pd = self._zeek_env.get_current_party_dirs()
+            lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
+            rc, out = lurkw.hide(value)
+            if rc > 0:
+                print(out)
+                print('New party failed.')
+            else:
+                self._zeek_env.add_party(out)            
+                value_str = ' '.join(value)    
+                print(f'Party {out} created for {value_str}.')
+        except Exception as e:
+            print(e)
+            print('Unexpected error while executing New party.')
 
     def handle_prove(self, test, value):
-        if not self._zeek_env.is_public():
-            try:
-                cd, pd = self._zeek_env.get_dirs()
-                lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
-                rc, out = lurkw.prove('0x'+test, '0x'+value)
-                key = None
-                if rc > 0:
-                    print(out)
-                    print('Prove failed.')
-                else:
-                    key = out
-                    print(f'Proof key {out} generated for call {test} {value}')
+        try:
+            cd, pd = self._zeek_env.get_current_party_dirs()
+            lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
+            rc, out = lurkw.prove('0x'+test, '0x'+value)
+            key = None
+            if rc > 0:
+               print(out)
+               print('Prove failed.')
+            else:
+                key = out
+                print(f'Proof key {out} generated for call {test} {value}')
                 return key
-            except Exception as e:
-                print(e)
-                print(f'Unexpected error while executing Prove.')
-        else:
-            print('Public can\'t prove.')
+        except Exception as e:
+            print(e)
+            print(f'Unexpected error while executing Prove.')
 
     def handle_verify(self, proof_key):
         try:
-            cd, pd = self._zeek_env.get_dirs()
+            cd, pd = self._zeek_env.get_current_party_dirs()
             lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
             out = lurkw.verify(proof_key)
             print(out)
@@ -124,60 +128,15 @@ class ZeekPrompt:
 
     def handle_inspect(self, proof_key, test, value, output):
         try:
-            cd, pd = self._zeek_env.get_dirs()
+            cd, pd = self._zeek_env.get_current_party_dirs()
             lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
-            rc, out = lurkw.inspect('\"'+proof_key+'\"', '0x'+test, '0x'+value, output)       
+            rc, out = lurkw.inspect(f'\"{proof_key}\"', f'0x{test}', f'0x{value}', output)       
             print(out)
             if rc > 0:
                 print('Inspect failed.')
         except Exception as e:
             print(e)
             print(f'Unexpected error while executing Inspect.')
-
-    def handle_disclose_proof(self, proof):
-        if not self._zeek_env.is_public():
-            if proof != None:
-                if ZeekEnv.is_proof(proof):
-                    self._zeek_env.disclose_proof_from_party(proof)
-                    print(f'Proof {proof} disclosed.')
-                else:
-                    print(f'Proof {proof} in wrong format.')
-            else:
-                print(f'Can\'t disclose {proof}.')
-        else:       
-            print('Public can\'t disclose.')
-
-    def handle_disclose_hash(self, hash):
-        if not self._zeek_env.is_public():
-            if hash != None:
-                self._zeek_env.disclose_commit_from_party(hash)
-                print(f'Hash {hash} disclosed.')
-            else:
-                print(f'Can\'t disclose {hash}.')
-        else:
-            print('Public can\'t disclose.')
-
-    def handle_disclose(self, last_secret, last_proof):
-        if not self._zeek_env.is_public():
-            if last_secret != None:
-                self._zeek_env.disclose_commit_from_party(last_secret)
-                print(f'Hash {last_secret} disclosed.')
-            elif last_proof != None:
-                self._zeek_env.disclose_proof_from_party(last_proof)
-                print(f'Proof key {last_proof} disclosed.')
-            else:
-                print('Nothing to disclose.')
-        else:
-            print('Public can\'t disclose.')
-        return None, None
-
-    def handle_disclosed(self):
-        print(f'Commits from public:')
-        for c in self._zeek_env.get_commits('public'):
-            print(c)
-        print(f'Proofs from public:')
-        for p in self._zeek_env.get_proofs('public'):
-            print(p)
 
     def handle_env(self):
         party = self._zeek_env.get_party()
@@ -191,3 +150,15 @@ class ZeekPrompt:
             print(f'Proofs from {party}:')
             for p in proofs:
                 print(f'\t{p}')
+                
+    def handle_send_commit(self, target_party, hash):
+        if self._zeek_env.is_commited_by_current_party(hash): 
+            self._zeek_env.send_commit_from_current_party(target_party, hash)
+        else:
+            print(f'Hash {hash} was not commited by {self._zeek_env.get_party()}.')
+
+    def handle_send_proof(self, target_party, proof):
+        if self._zeek_env.is_proven_by_current_party(proof): 
+            self._zeek_env.send_proof_from_current_party(target_party, proof)
+        else:
+            print(f'Proof {proof} was not generated by {self._zeek_env.get_party()}.')

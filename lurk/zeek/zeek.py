@@ -13,9 +13,9 @@ except Exception as e:
             
 def _main(path):
     zeek_prompt = ZeekPrompt(ZeekEnv(path))
-    last_secret  = None
-    last_proof   = None
-    cmd          = None
+    last_secret = None
+    last_proof  = None
+    cmd         = None
     while True:
         try:
             cmd = zeek_prompt.prompt()
@@ -24,14 +24,6 @@ def _main(path):
                     zeek_prompt.handle_call(test, value)
                 case ['check', 'call', test, value, 'returns',  output, 'in', proof_key]:
                     zeek_prompt.handle_inspect(proof_key, test, value, output)
-                case ['disclose']:
-                    last_secret, last_proof = zeek_prompt.handle_disclose(last_secret, last_proof)
-                case ['disclose', 'hash', hash]:
-                    zeek_prompt.handle_disclose_hash(hash)
-                case ['disclose', 'proof', proof]:
-                    zeek_prompt.handle_disclose_proof(proof)
-                case ['disclosed']:
-                    zeek_prompt.handle_disclosed()
                 case ['env']:
                     zeek_prompt.handle_env()
                 case ['exit']:
@@ -49,8 +41,10 @@ def _main(path):
                     zeek_prompt.handle_new_party(value)
                 case ['prove', test, value]:
                     last_proof = zeek_prompt.handle_prove(test, value)
-                case ['public']:
-                    party = 'public'
+                case ['send', 'secret', commit, 'to', target_party]:
+                    zeek_prompt.handle_send_commit(target_party, commit)
+                case ['send', 'proof', proof_key, 'to', target_party]:
+                    zeek_prompt.handle_send_proof(target_party, proof_key)
                 case ['verify', proof_key]:
                     zeek_prompt.handle_verify(proof_key)
                 case other:
@@ -66,7 +60,7 @@ def _main(path):
 if __name__ == '__main__':
     try:
         os.system('clear')
-        print('Zeek: ZK Protocol Simulator')
+        print('Zeek: Prototype ZK Protocol Simulator')
         print('Powered by Lurk')
         print()
         _main(f'{os.getcwd()}/.zeek')

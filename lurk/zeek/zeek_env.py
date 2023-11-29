@@ -20,14 +20,13 @@ class ZeekEnv:
     def __init__(self, dir, timeout=15):
         self._dir     = dir
         self._hist    = f'{self._dir}/.zeekhistory'
-        self._party = 'public'
+        self._party = None
         self._timeout = timeout
         if not os.path.exists(self._dir):
             os.makedirs(self._dir)
         if not os.path.isfile(self._hist):
             f = open(self._hist,'a')
             f.close()
-        self.add_party('public')
 
     def add_party(self, party):
         assert(os.path.exists(self._dir))
@@ -65,9 +64,6 @@ class ZeekEnv:
     def get_party(self):
         return self._party
     
-    def is_public(self):
-        return self._party == 'public'
-    
     def get_hist(self):
         return self._hist
     
@@ -75,7 +71,7 @@ class ZeekEnv:
         return f'{self._dir}/{party}/{ZeekEnv._COMMITS_DIR}', \
                f'{self._dir}/{party}/{ZeekEnv._PROOFS_DIR}'
 
-    def get_dirs(self):
+    def get_current_party_dirs(self):
         return self.get_party_dirs(self._party)
 
     def get_secrets(self, party, secret):
@@ -110,39 +106,36 @@ class ZeekEnv:
     def get_proofs_from_party(self):
         return self.get_proofs(self.get_party())
 
-    def is_commit_public(self, hash):
-        return self.is_commited('public', hash)
-
     def is_commited(self, party, hash):
         return hash in self.get_commits(party)
 
     def is_proven(self, party, proof):
         return proof in self.get_proofs(party)
-
-    def is_commited_by_party(self, hash):
-        return self.is_commited(self.get_party(), hash)
-
-    def is_commited_by_party_or_public(self, hash):
-        return self.is_commited(self.get_party(), hash) or self.is_commit_public(hash)
     
-    def disclose_commit(self, party, hash):
-        assert(party != 'public')
-        assert(self.is_commited(party, hash))
-        # shutil.copy2 preserves time.
-        sh.copy2(f'{self._dir}/{party}/{ZeekEnv._COMMITS_DIR}/{hash}.commit', 
-                 f'{self._dir}/public/{ZeekEnv._COMMITS_DIR}')
-        
-    def disclose_commit_from_party(self, hash):
-        self.disclose_commit(self.get_party(), hash)
+    def is_proven_by_current_party(self, proof):
+        return self.is_proven(self.get_party(), proof)
 
-    def disclose_proof(self, party, proof):
-        assert(party != 'public')
-        assert(self.is_proven(party, proof))
+    def is_commited_by_current_party(self, hash):
+        return self.is_commited(self.get_party(), hash)
+    
+    def send_commit(self, source_party, target_party, hash):
+        assert(self.is_commited(source_party, hash))
+        assert(not self.is_commited(target_party, hash))
         # shutil.copy2 preserves time.
-        sh.copy2(f'{self._dir}/{party}/{ZeekEnv._PROOFS_DIR}/{proof}.proof', 
-                 f'{self._dir}/public/{ZeekEnv._PROOFS_DIR}')
-        sh.copy2(f'{self._dir}/{party}/{ZeekEnv._PROOFS_DIR}/{proof}.meta', 
-                 f'{self._dir}/public/{ZeekEnv._PROOFS_DIR}')
+        sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._COMMITS_DIR}/{hash}.commit', 
+                 f'{self._dir}/{target_party}/{ZeekEnv._COMMITS_DIR}')
+
+    def send_commit_from_current_party(self, target_party, hash):
+        self.send_commit(self.get_party(), target_party, hash)
+
+    def send_proof(self, source_party, target_party, proof):
+        assert(self.is_proven(source_party, proof))
+        assert(not self.is_proven(target_party, proof))
+        # shutil.copy2 preserves time.
+        sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._PROOFS_DIR}/{proof}.proof', 
+                 f'{self._dir}/{target_party}/{ZeekEnv._PROOFS_DIR}')
+        sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._PROOFS_DIR}/{proof}.meta', 
+                 f'{self._dir}/{target_party}/{ZeekEnv._PROOFS_DIR}')
         
-    def disclose_proof_from_party(self, proof):
-        self.disclose_proof(self.get_party(), proof)
+    def send_proof_from_current_party(self, target_party, proof):
+        return self.send_proof(self.get_party(), target_party, proof)
