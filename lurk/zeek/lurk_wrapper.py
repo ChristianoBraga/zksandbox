@@ -52,11 +52,16 @@ class LurkWrapper:
     
     def _has_error(out):
         assert(out != '' or out != None)
-        return out.find('Error:') > 0
-
+        return 'Error' in out or 'failed' in out
+        
     def _get_error(out):
         assert(out != '' or out != None)
-        return out[out.find('Error:'):len(out)-1]
+        if 'Error' in out:
+            return out[out.find('Error:'):len(out)-1]
+        elif 'failed' in out:
+            return out[out.find('failed with ') + len('failed with '):out.find('\nExiting...')]
+        else:
+            return None
     
     def _get_hash(out):
         assert(not LurkWrapper._has_error(out))

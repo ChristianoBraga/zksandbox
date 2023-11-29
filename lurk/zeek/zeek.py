@@ -1,20 +1,18 @@
 #!/usr/bin/python3
 try:
     import os
-    import prompt_toolkit as pt
+    import traceback as tb
     from lurk_wrapper import *
     from zeek_env import *
     from zeek_prompt import *
 except Exception as e:
     print(e)
     print('Check your Python 3 installation.')
-    print('Either shutil, subprocess, random, os, prompt_toolkit, string or lurk_wrapper is missing.')
+    print('Either os, lurk_wrapper, zeek_env or zeek_prompt is missing.')
     exit(1)
             
 def _main(path):
-    zeek_prompt = ZeekPrompt(ZeekEnv(path))
-    last_secret = None
-    last_proof  = None
+    zeek_prompt = ZeekPrompt(path)
     cmd         = None
     while True:
         try:
@@ -31,14 +29,39 @@ def _main(path):
                     break
                 case ['help']:
                     print('To be written...')
+                case ['hide', *value, 'in', 'label', label]:
+                    zeek_prompt.handle_hide(value)
                 case ['hide', *value]:
-                    last_secret = zeek_prompt.handle_hide(value)
+                    zeek_prompt.handle_hide(value)
+                case ['labels']:
+                    if not zeek_prompt.empty_labels():
+                        [print(f'Secret {s} is labeled {l}') for l, s in zeek_prompt.get_items()]
+                    else:
+                        print('No labels to print.')
                 case ['parties']:
                     zeek_prompt.handle_parties()
+                case ['party', 'labeled', label]:
+                    if label in zeek_prompt.get_labels():
+                        zeek_prompt.handle_party(zeek_prompt.get_value(label))
+                    else:
+                        print(f'There is no party labeled {label}.')    
                 case ['party', hash]:
                     zeek_prompt.handle_party(hash)
+                case ['new', 'party', *value, 'labeled', label]:
+                    if zeek_prompt.is_public(): 
+                        if label not in zeek_prompt.get_labels():
+                            out = zeek_prompt.handle_new_party(value)
+                            if out != None:
+                                zeek_prompt.set_label(label, out) 
+                        else:
+                            print(f'Label {label} already exists.')
+                    else:
+                        print('Only public can create party.') 
                 case ['new', 'party', *value]:
-                    zeek_prompt.handle_new_party(value)
+                    if zeek_prompt.is_public(): 
+                        _ = zeek_prompt.handle_new_party(value)
+                    else:
+                        print('Only public can create party.')                     
                 case ['prove', test, value]:
                     last_proof = zeek_prompt.handle_prove(test, value)
                 case ['send', 'secret', commit, 'to', target_party]:
@@ -47,6 +70,12 @@ def _main(path):
                     zeek_prompt.handle_send_proof(target_party, proof_key)
                 case ['verify', proof_key]:
                     zeek_prompt.handle_verify(proof_key)
+                case ['run', cmd, 'with', 'labels', *arg_labels]:
+                    args = [ zeek_prompt.get_value(l) for l in arg_labels if l in zeek_prompt.get_labels()]
+                    if len(args) != len(arg_labels):
+                        print('Some of the labels do not exist.')
+                        continue
+                    zeek_prompt.handle(cmd, args)
                 case other:
                     other_str = ' '.join(other)
                     print(f'Unknown command {other_str}.')
@@ -54,7 +83,7 @@ def _main(path):
             print()
             continue           
         except EOFError:
-            print('\nBye')
+            zeek_prompt.good_bye()
             break
 
 if __name__ == '__main__':
@@ -67,5 +96,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
         print(type(e))
+        print(tb.print_exc())
         print('zeek internal error.')
         exit(1)

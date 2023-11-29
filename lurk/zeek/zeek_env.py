@@ -11,7 +11,7 @@ except Exception as e:
 class ZeekEnv:
     _COMMITS_DIR = 'commits'
     _PROOFS_DIR  = 'proofs'
-    _HASHS_IZE   = 66
+    _HASH_SIZE   = 64
     _PROOF_SIZE  = 79
     '''
     A commit or proof is not represented in memory. Any computation that
@@ -19,20 +19,24 @@ class ZeekEnv:
     '''
     def __init__(self, dir, timeout=15):
         self._dir     = dir
-        self._hist    = f'{self._dir}/.zeekhistory'
-        self._party = None
+        self._hist    = f'{self._dir}/.zeek_history'
+        self._party = 'public'
         self._timeout = timeout
         if not os.path.exists(self._dir):
             os.makedirs(self._dir)
         if not os.path.isfile(self._hist):
             f = open(self._hist,'a')
             f.close()
+        self.add_party('public')
 
     def add_party(self, party):
         assert(os.path.exists(self._dir))
         if (not os.path.exists(f'{self._dir}/{party}')):
             os.makedirs(f'{self._dir}/{party}/{ZeekEnv._COMMITS_DIR}')
             os.makedirs(f'{self._dir}/{party}/{ZeekEnv._PROOFS_DIR}')
+
+    def get_path(self):
+        return self._dir
 
     def get_timeout(self):
         return self._timeout
@@ -52,7 +56,7 @@ class ZeekEnv:
         return (len(proof) == ZeekEnv._PROOF_SIZE) and (proof_prefix in proof) and all(c in string.hexdigits for c in proof.strip(proof_prefix))
 
     def is_hash(hash):
-        return len(hash) == ZeekEnv._HASH_SIZE and (hash[0:2] == '0x') and all(c in string.hexdigits for c in hash[2:])
+        return len(hash) == ZeekEnv._HASH_SIZE and all(c in string.hexdigits for c in hash[2:])
 
     def set_party(self, party):
         if party in self.get_parties():
