@@ -78,6 +78,14 @@ class ZeekPrompt:
         match cmd:
             case 'call':
                 self.handle_call(args[0], args[1])
+            case 'hide':
+                print('Type hide <value> in label <label> instead.')
+            case 'check':
+                proof_key = args[0]
+                test      = args[1]
+                value     = args[2]
+                output    = args[3]
+                self.handle_inspect(proof_key,test, value, output)
 
     def handle_call(self, test, value):
         '''
@@ -170,6 +178,7 @@ class ZeekPrompt:
             if rc > 0:
                print(out)
                print('Prove failed.')
+               return None
             else:
                 key = out
                 print(f'Proof key {out} generated for call {test} {value}')

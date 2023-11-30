@@ -30,7 +30,9 @@ def _main(path):
                 case ['help']:
                     print('To be written...')
                 case ['hide', *value, 'in', 'label', label]:
-                    zeek_prompt.handle_hide(value)
+                    hash = zeek_prompt.handle_hide(value)
+                    if hash != None:
+                        zeek_prompt.set_label(label, hash)
                 case ['hide', *value]:
                     zeek_prompt.handle_hide(value)
                 case ['labels']:
@@ -62,8 +64,26 @@ def _main(path):
                         _ = zeek_prompt.handle_new_party(value)
                     else:
                         print('Only public can create party.')                     
+                case ['prove', 'with', 'labels', 
+                      test_label, value_label, 
+                      'in', proof_key_label]:
+                    if not zeek_prompt.is_public():
+                        if test_label in zeek_prompt.get_labels() and \
+                           value_label in zeek_prompt.get_labels():
+                            test = zeek_prompt.get_value(test_label)
+                            value = zeek_prompt.get_value(value_label) 
+                            proof_key = zeek_prompt.handle_prove(test, value)
+                            if proof_key != None:
+                                zeek_prompt.set_label(proof_key_label, proof_key)
+                                print(f'Proof {proof_key} labeled {proof_key_label}.')
+                            else:
+                                print(f'Label {proof_key_label} not created.')
+                        else:
+                            print('Labels do not exist.')
+                    else:
+                        print(f'Change party to the one holding secrets {test_label} and {value_label}.')
                 case ['prove', test, value]:
-                    last_proof = zeek_prompt.handle_prove(test, value)
+                    zeek_prompt.handle_prove(test, value)
                 case ['send', 'secret', commit, 'to', target_party]:
                     zeek_prompt.handle_send_commit(target_party, commit)
                 case ['send', 'proof', proof_key, 'to', target_party]:
