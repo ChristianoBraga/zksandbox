@@ -138,9 +138,9 @@ class LurkWrapper:
             apply_cmd = LurkWrapper._mk_apply_cmd(test, value)
             out = self._run(apply_cmd[0], apply_cmd[1])
             if LurkWrapper._has_error(out):
-                return LurkWrapper._get_error(out)
+                return 1, LurkWrapper._get_error(out)
             else:
-                return LurkWrapper._get_output(out)
+                return 0, LurkWrapper._get_output(out)
         except Exception as e:
             print(e)
             raise LurkWrapperCommException('Apply failed.')
@@ -162,9 +162,9 @@ class LurkWrapper:
             verify_cmd = LurkWrapper._mk_verify_cmd(proof_key)
             out = self._run(verify_cmd[0], verify_cmd[1])
             if LurkWrapper._has_error(out):
-                return LurkWrapper._get_error(out)
+                return 1, LurkWrapper._get_error(out)
             else:
-                return LurkWrapper._get_verify_output(out)
+                return 0, LurkWrapper._get_verify_output(out)
         except Exception as e:
             print(e)
             raise LurkWrapperCommException('Verify failed.')

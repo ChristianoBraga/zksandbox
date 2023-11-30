@@ -126,20 +126,28 @@ class ZeekEnv:
         assert(self.is_commited(source_party, hash))
         assert(not self.is_commited(target_party, hash))
         # shutil.copy2 preserves time.
-        sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._COMMITS_DIR}/{hash}.commit', 
-                 f'{self._dir}/{target_party}/{ZeekEnv._COMMITS_DIR}')
+        try:
+            sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._COMMITS_DIR}/{hash}.commit', 
+                     f'{self._dir}/{target_party}/{ZeekEnv._COMMITS_DIR}')
+            return 0, f'Secret {hash} sent to {target_party}.'
+        except Exception as e:
+            return 1, e
 
     def send_commit_from_current_party(self, target_party, hash):
-        self.send_commit(self.get_party(), target_party, hash)
+        return self.send_commit(self.get_party(), target_party, hash)
 
     def send_proof(self, source_party, target_party, proof):
         assert(self.is_proven(source_party, proof))
         assert(not self.is_proven(target_party, proof))
         # shutil.copy2 preserves time.
-        sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._PROOFS_DIR}/{proof}.proof', 
-                 f'{self._dir}/{target_party}/{ZeekEnv._PROOFS_DIR}')
-        sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._PROOFS_DIR}/{proof}.meta', 
-                 f'{self._dir}/{target_party}/{ZeekEnv._PROOFS_DIR}')
-        
+        try:
+            sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._PROOFS_DIR}/{proof}.proof', 
+                     f'{self._dir}/{target_party}/{ZeekEnv._PROOFS_DIR}')
+            sh.copy2(f'{self._dir}/{source_party}/{ZeekEnv._PROOFS_DIR}/{proof}.meta', 
+                     f'{self._dir}/{target_party}/{ZeekEnv._PROOFS_DIR}')
+            return 0, f'Proof {proof} sent to {target_party}.'
+        except Exception as e:
+            return 1, e
+
     def send_proof_from_current_party(self, target_party, proof):
         return self.send_proof(self.get_party(), target_party, proof)
