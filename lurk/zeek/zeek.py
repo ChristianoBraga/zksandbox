@@ -8,7 +8,7 @@ try:
 except Exception as e:
     print(e)
     print('Check your Python 3 installation.')
-    print('Either os, lurk_wrapper, zeek_env or zeek_prompt is missing.')
+    print('Either os, traceback, lurk_wrapper, zeek_env or zeek_prompt is missing.')
     exit(1)
 
 def _main(path):
