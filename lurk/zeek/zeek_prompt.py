@@ -54,19 +54,30 @@ class ZeekPrompt:
         return self._labels == {}
     
     def get_labels(self):
-        return self._labels.keys()
+        return self._labels.keys()   if self._labels != {} else None 
 
     def get_values(self):
-        return self._labels.values()
+        return self._labels.values() if self._labels != {} else None 
 
     def get_items(self):
-        return self._labels.items()
+        return self._labels.items()  if self._labels != {} else None 
     
     def get_value(self, l):
-        return self._labels[l]
+        return self._labels[l] \
+               if self._labels != {} and l in self._labels.keys() else None
 
     def set_label(self, l, v):
-        self._labels[l] = v
+        if self._labels != {}:
+            self._labels[l] = v 
+            return 0
+        else:
+            return 1
+
+    def find_label_for_value(self, value):
+        key_list = [k for k in self._labels if self._labels[k] == value]
+        if key_list != []:
+            return key_list[0]
+        return None
 
     def is_public(self):
         return self._zeek_env.get_party() == 'public'
@@ -108,23 +119,26 @@ class ZeekPrompt:
             return 1, 'Only non-public parties may hide values.'
     
     def handle_parties(self):
-        parties = self._zeek_env.get_parties()
-        if parties != [] and parties != None:
-            parties.sort()
-            return 0, parties
+        if self.is_public():
+            parties = self._zeek_env.get_parties()
+            if parties != [] and parties != None:
+                parties.sort()
+                return 0, parties
+            else:
+                return 1, 'There are no parties'
         else:
-            return 1, 'There are no parties'
+            return 1, 'Only public can query parties.'
 
-    def handle_party(self, hash):
+    def handle_party(self, party):
         current_party = self._zeek_env.get_party()  
-        assert(current_party != None and (ZeekEnv.is_hash(current_party) or current_party == 'public') and ZeekEnv.is_hash(hash))
-        if hash == current_party:
+        assert(current_party != None and (ZeekEnv.is_hash(current_party) or current_party == 'public') and (ZeekEnv.is_hash(party) or party == 'public'))
+        if party == current_party:
             return 0, f'Party is already {current_party}.'
         else: 
-            if self._zeek_env.set_party(hash):
-                return 0, f'Party set to {hash}.'
+            if self._zeek_env.set_party(party):
+                return 0, f'Party set to {party}.'
             else:
-                return 1, f'Party {hash} does not exist.\nParty is still {current_party}.'
+                return 1, f'Party {party} does not exist.\nParty is still {current_party}.'
 
     def handle_new_party(self, value):
         assert(type(value) == list)
