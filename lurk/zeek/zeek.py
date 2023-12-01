@@ -126,11 +126,15 @@ def _main(path):
                     else:
                         print('No labels to print.')
                 case ['parties']:
-                    _, out = zeek_prompt.handle_parties()
-                    [print(f'Party {p} is labeled {zeek_prompt.find_label_for_value(p)}') 
-                          if zeek_prompt.find_label_for_value(p) != None 
-                          else print(p) if p == 'public' 
-                          else print(f'Party {p} is unlabeled') for p in out][0]
+                    rc, out = zeek_prompt.handle_parties()
+                    if rc == 0:
+                        [print(f'Party {p} is labeled {zeek_prompt.find_label_for_value(p)}') 
+                            if zeek_prompt.find_label_for_value(p) != None 
+                            else print(p) if p == 'public' 
+                                          else print(f'Party {p} is unlabeled') for p in out][0]
+                    else:
+                        print(out)
+                        print('Parties failed.')
                 case ['party', label]:
                     if label in zeek_prompt.get_labels():
                        party = zeek_prompt.get_value(label)
