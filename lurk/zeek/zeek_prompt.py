@@ -2,20 +2,21 @@ try:
     import os
     import json
     import prompt_toolkit as pt
+    from prompt_toolkit.completion import NestedCompleter
     from lurk_wrapper import *
     from zeek_env import *
 except Exception as e:
     print(e)
     print('Check your Python 3 installation.')
-    print('Either json, prompt_toolkit, lurk_wrapper or zeek_env is missing.')
+    print('Either os, json, prompt_toolkit, lurk_wrapper or zeek_env is missing.')
     exit(1) 
 
 class ZeekPrompt:
     def __init__(self, path):
         self._zeek_env = ZeekEnv(path)
-        self.completer = pt.completion.WordCompleter(
-            ['call', 'check', 'disclose', 'disclosed', 'env', 'exit', 'help',
-             'hide', 'party', 'prove', 'public', 'verify'], ignore_case=True)
+        # self.completer = pt.completion.WordCompleter(
+            # ['call', 'check call', 'env', 'exit', 'hash hide', 'hash new party', 'help', 'hide', 'labels', 'new party', 
+            #  'parties', 'party', 'hash prove', 'prove', 'save labels', 'send secret', 'send proof', 'verify'], ignore_case=True)
         self.session = pt.PromptSession(history=pt.history.FileHistory(self._zeek_env.get_hist()))
         labels_file_name = f'{path}/labels.json' 
         if os.path.exists(labels_file_name) and \
@@ -26,52 +27,74 @@ class ZeekPrompt:
         else:
             self._labels = {}
 
-    def good_bye(self):
-        print('\nBye')
+    def save_labels(self):
         if self._labels != {}:
             labels_file_name = f'{self._zeek_env.get_path()}/labels.json'
             fh = open(labels_file_name, 'w')
             json.dump(self._labels, fh, indent=4)  
             fh.close()              
 
+
+    def good_bye(self):
+        print('\nBye')
+        self.save_labels()
+
     def _right_prompt(self, party):
         if party != None and ZeekEnv.is_hash(party):
             if not self.empty_labels():
                 k = [l for l, v in self._labels.items() if v == party]
-                return f'{k[0]}:{party[:4]}...{party[len(party) - 4:]}'
+                return f'<ansiyellow>{k[0]}</ansiyellow>:<ansigreen>{party[:4]}...{party[len(party) - 4:]}</ansigreen>'
             else:
-                return f'{party[:4]}...{party[len(party) - 4:]}'
+                return f'<ansigreen>{party[:4]}...{party[len(party) - 4:]}</ansigreen>'
         elif party == 'public':
-            return 'public'
+            return '<ansiyellow>public</ansiyellow>'
         else:
             return ''
 
     def prompt(self):
         # return self.session.prompt('zeek ❯ ', completer=self.completer, rprompt=party)
-        return self.session.prompt('zeek ❯ ', rprompt=self._right_prompt(self._zeek_env.get_party()))
+        style = pt.styles.Style.from_dict({
+            # User input (default text).
+            # '':              '#ff0066',
+            # Prompt.
+            'tool':          'ansigreen',
+            'prompt_symbol': 'ansiyellow'
+        })
+        message = [
+            ('class:tool',          'zeek '),
+            ('class:prompt_symbol', '❯ '),
+        ]
+        self.completer = NestedCompleter.from_nested_dict({
+            'call' : {str(self.find_label_for_value(c1)) 
+                        if self.find_label_for_value(c1) != None else c1 : 
+                            {str(self.find_label_for_value(c2)) 
+                                if self.find_label_for_value(c2) != None else c2 : None 
+                                for c2 in self._zeek_env.get_commits_from_party()} 
+                        for c1 in self._zeek_env.get_commits_from_party()}, 
+            'party': {str(self.find_label_for_value(item)) 
+                        if self.find_label_for_value(item) != None 
+                        else item : None for item in self._zeek_env.get_parties()}
+        })
+        return self.session.prompt(message, style=style, completer=self.completer, rprompt=pt.HTML(self._right_prompt(self._zeek_env.get_party())))
 
     def empty_labels(self):
         return self._labels == {}
     
     def get_labels(self):
-        return self._labels.keys()   if self._labels != {} else None 
-
+        return self._labels.keys()
+    
     def get_values(self):
-        return self._labels.values() if self._labels != {} else None 
+        return self._labels.values()
 
     def get_items(self):
-        return self._labels.items()  if self._labels != {} else None 
+        return self._labels.items()
     
     def get_value(self, l):
-        return self._labels[l] \
-               if self._labels != {} and l in self._labels.keys() else None
+        assert(self._labels != {} and l in self._labels.keys())
+        return self._labels[l]
 
     def set_label(self, l, v):
-        if self._labels != {}:
-            self._labels[l] = v 
-            return 0
-        else:
-            return 1
+        self._labels[l] = v 
 
     def find_label_for_value(self, value):
         key_list = [k for k in self._labels if self._labels[k] == value]

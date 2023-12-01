@@ -5,6 +5,7 @@ try:
     from lurk_wrapper import *
     from zeek_env import *
     from zeek_prompt import *
+    from prompt_toolkit import print_formatted_text, HTML
 except Exception as e:
     print(e)
     print('Check your Python 3 installation.')
@@ -42,7 +43,6 @@ def _main(path):
                         print('Call successful.')
                     else:
                         print('Call failed.')
-
                 case ['check', 'call', test_label, value_label, 'returns',  output_label, 'in', proof_key_label]:
                     labels = zeek_prompt.get_labels()
                     if test_label in labels:
@@ -85,22 +85,41 @@ def _main(path):
                         print('Check failed.')
                 case ['env']:
                     commits, proofs = zeek_prompt.handle_env()
+                    if commits == [] and proofs == []:
+                        print('Neither secrets nor proofs to print.')
                     if commits != []:
                         print('Commits:')
-                        [print(f'Secret {c} is labeled {zeek_prompt.find_label_for_value(c)}') 
+                        [print_formatted_text(HTML(f'Secret <ansigreen>{c}</ansigreen> is labeled <ansiyellow>{zeek_prompt.find_label_for_value(c)}</ansiyellow>')) 
                             if zeek_prompt.find_label_for_value(c) != None 
-                            else print(f'Secret {c} is unlabeled') for c in commits][0]
+                            else print_formatted_text(HTML(f'Secret <ansigreen>{c}</ansigreen> is <ansigray>unlabeled</ansigray>')) for c in commits][0]
                     if proofs != []:
                         print('Proofs:')
-                        [print(f'Proof {p} is labeled {zeek_prompt.find_label_for_value(p)}') 
+                        [print_formatted_text(HTML(f'Proof <ansiblue>{p}</ansiblue> is labeled <ansiyellow>{zeek_prompt.find_label_for_value(p)}</ansiyellow>'))
                             if zeek_prompt.find_label_for_value(p) != None 
-                            else print(f'Proof {p} is unlabeled') for p in proofs][0]
+                            else print_formatted_text(HTML(f'Proof <ansiblue>{p}</ansiblue> is <ansigray>unlabeled</ansigray>')) for p in proofs][0]
                 case ['exit']:
                     zeek_prompt.good_bye()
                     break
+                case ['hash','hide', *value]:
+                    rc, out = zeek_prompt.handle_hide(value)
+                    print(out)
+                    if rc == 0:
+                       print('Hide successful.')
+                    else:
+                       print('Hide failed.')
+                case ['hash', 'new', 'party', *value]:
+                    if zeek_prompt.is_public(): 
+                        rc, out = zeek_prompt.handle_new_party(value)
+                        print(out)
+                        if rc == 0:
+                           print('New party successful.')
+                        else:
+                           print('New party failed.')
+                    else:
+                        print('Only public can create party.')                     
                 case ['help']:
                     print('To be written...')
-                case ['hide', *value, 'in', label]:
+                case ['hide', *value, 'as', label]:
                     if label in zeek_prompt.get_labels():
                        print(f'Label {label} exists.')
                        print('Hide failed.')
@@ -113,50 +132,13 @@ def _main(path):
                           print('Hide successful.')
                        else:
                           print('Hide failed.')
-                case ['hide', *value]:
-                    rc, out = zeek_prompt.handle_hide(value)
-                    print(out)
-                    if rc == 0:
-                       print('Hide successful.')
-                    else:
-                       print('Hide failed.')
                 case ['labels']:
                     if not zeek_prompt.empty_labels():
-                        [print(f'Secret {s} is labeled {l}') for l, s in zeek_prompt.get_items()]
+                        [print_formatted_text(HTML(f'Secret <ansigreen>{s}</ansigreen> is labeled <ansiyellow>{l}</ansiyellow>')) if ZeekEnv.is_hash(s) else
+                         print_formatted_text(HTML(f'Proof  <ansiblue>{s}</ansiblue> is labeled <ansiyellow>{l}</ansiyellow>')) for l, s in zeek_prompt.get_items()]
                     else:
                         print('No labels to print.')
-                case ['parties']:
-                    rc, out = zeek_prompt.handle_parties()
-                    if rc == 0:
-                        [print(f'Party {p} is labeled {zeek_prompt.find_label_for_value(p)}') 
-                            if zeek_prompt.find_label_for_value(p) != None 
-                            else print(p) if p == 'public' 
-                                          else print(f'Party {p} is unlabeled') for p in out][0]
-                    else:
-                        print(out)
-                        print('Parties failed.')
-                case ['party', label]:
-                    if label in zeek_prompt.get_labels():
-                       party = zeek_prompt.get_value(label)
-                    else:
-                       party = label
-                    rc, out = zeek_prompt.handle_party(party)
-                    print(out)
-                    if rc == 0:
-                       print('Party successful.')
-                    else:
-                       print('Party failed.')
-                case ['new', 'party', *value]:
-                    if zeek_prompt.is_public(): 
-                        rc, out = zeek_prompt.handle_new_party(value)
-                        print(out)
-                        if rc == 0:
-                           print('New party successful.')
-                        else:
-                           print('New party failed.')
-                    else:
-                        print('Only public can create party.')                     
-                case ['new', 'party', *value, 'labeled', label]:
+                case ['new', 'party', *value, 'as', label]:
                     if zeek_prompt.is_public(): 
                         if label not in zeek_prompt.get_labels():
                             rc, out = zeek_prompt.handle_new_party(value)
@@ -170,28 +152,36 @@ def _main(path):
                             print(f'Label {label} already exists.')
                     else:
                         print('Only public can create a party.') 
-                case ['prove', test_label, value_label, 
-                      'in',    proof_key_label]:
-                    if not zeek_prompt.is_public():
-                        if test_label in zeek_prompt.get_labels() and \
-                           value_label in zeek_prompt.get_labels():
-                           test = zeek_prompt.get_value(test_label)
-                           value = zeek_prompt.get_value(value_label) 
-                           rc, proof_key = zeek_prompt.handle_prove(test, value)
-                           print(proof_key)
-                           if rc == 0:
-                              zeek_prompt.set_label(proof_key_label, proof_key)
-                              print(f'Prove sucessful.')
-                           else:
-                              print(f'Prove failed.')
-                        else:
-                           print('Labels do not exist.')
+                case ['parties']:
+                    rc, out = zeek_prompt.handle_parties()
+                    if rc == 0:
+                        [print_formatted_text(HTML(f'Party <ansigreen>{p}</ansigreen> is labeled <ansiyellow>{zeek_prompt.find_label_for_value(p)}</ansiyellow>')) 
+                            if zeek_prompt.find_label_for_value(p) != None 
+                            else print_formatted_text(HTML(f'<ansiyellow>{p}</ansiyellow>')) if p == 'public' 
+                            else print_formatted_text(HTML(f'Party <ansigreen>{p}</ansigreen> is <ansidarkgray>unlabeled</ansidarkgray>')) for p in out][0]
                     else:
-                       print(f'Change party to the one holding secrets {test_label} and {value_label}.')
-                case ['prove', test, value]:
+                        print(out)
+                        print('Parties failed.')
+                case ['party', label]:
+                    if label in zeek_prompt.get_labels():
+                        party = zeek_prompt.get_value(label)
+                    elif ZeekEnv.is_hash(label) and label in zeek_prompt.get_parties() or label == 'public' :
+                        party = label
+                    else:
+                        print(f'Argument {label} is neither a label nor a valid hash.')
+                        continue
+                    rc, out = zeek_prompt.handle_party(party)
+                    print(out)
+                    if rc == 0:
+                       print('Party successful.')
+                    else:
+                       print('Party failed.')
+                case ['hash', 'prove', test, value]:
                     if not zeek_prompt.is_public():
                       if ZeekEnv.is_hash(test) and ZeekEnv.is_hash(value):
-                          rc, out = zeek_prompt.handle_prove(test, value)
+                          with pt.shortcuts.ProgressBar() as pb:
+                            for _ in pb(range(zeek_prompt._zeek_env.get_timeout()), label='Generating proof...'):
+                                rc, out = zeek_prompt.handle_prove(test, value)
                           print(out)
                           if rc == 0:
                              print(f'Prove sucessful.')
@@ -200,7 +190,30 @@ def _main(path):
                       else:
                           print('Both arguments of prove should be hashes.') 
                     else:
+                       print(f'Change party to the one holding secrets {test} and {value}.')
+                case ['prove', test_label, value_label, 
+                      'as',    proof_key_label]:
+                    if not zeek_prompt.is_public():
+                        if test_label in zeek_prompt.get_labels() and \
+                           value_label in zeek_prompt.get_labels():
+                           test = zeek_prompt.get_value(test_label)
+                           value = zeek_prompt.get_value(value_label) 
+                           with pt.shortcuts.ProgressBar() as pb:
+                                for _ in pb(range(zeek_prompt._zeek_env.get_timeout()), label='Generating proof...'):
+                                    rc, out = zeek_prompt.handle_prove(test, value)
+                           print(out)
+                           if rc == 0:
+                              zeek_prompt.set_label(proof_key_label, out)
+                              print(f'Prove sucessful.')
+                           else:
+                              print(f'Prove failed.')
+                        else:
+                           print('Labels do not exist.')
+                    else:
                        print(f'Change party to the one holding secrets {test_label} and {value_label}.')
+                case ['save', 'labels']:
+                    zeek_prompt.save_labels()
+                    print('Labels saved.')
                 case ['send', 'secret', commit, 'to', target_party]:
                     if not zeek_prompt.is_public():
                         labels = zeek_prompt.get_labels()
@@ -262,15 +275,18 @@ def _main(path):
                         value = proof_key
                     elif proof_key in zeek_prompt.get_labels():
                         value = zeek_prompt.get_value(proof_key)
-                        rc, out = zeek_prompt.handle_verify(f'\"{value}\"')
-                        out = out.replace('"', '')
-                        print(out)
-                        if rc == 0:
-                           print(f'Verify proof sucessful.')
-                        else:
-                           print(f'Verify proof failed.')    
                     else:
                         print(f'Argument {proof_key} is neither a label or a proof key.')                  
+                        continue
+                    with pt.shortcuts.ProgressBar() as pb:
+                        for _ in pb(range(int(zeek_prompt._zeek_env.get_timeout()/10)), label='Verifying proof...'):
+                            rc, out = zeek_prompt.handle_verify(f'\"{value}\"')
+                    out = out.replace('"', '')
+                    print(out)
+                    if rc == 0:
+                       print(f'Verify proof sucessful.')
+                    else:
+                       print(f'Verify proof failed.')    
                 case other:
                     other_str = ' '.join(other)
                     print(f'Unknown command {other_str}.')
@@ -284,8 +300,8 @@ def _main(path):
 if __name__ == '__main__':
     try:
         os.system('clear')
-        print('Zeek: Prototype ZK Protocol Simulator')
-        print('Powered by Lurk')
+        print_formatted_text(HTML('<ansiblue>Zeek: Prototype ZK Protocol Simulator</ansiblue>'))
+        print_formatted_text(HTML('<i>Powered by Lurk</i>'))
         print()
         _main(f'{os.getcwd()}/.zeek')
     except Exception as e:
