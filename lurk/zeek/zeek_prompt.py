@@ -52,7 +52,6 @@ class ZeekPrompt:
             return ''
 
     def prompt(self):
-        # return self.session.prompt('zeek ❯ ', completer=self.completer, rprompt=party)
         style = pt.styles.Style.from_dict({
             # User input (default text).
             # '':              '#ff0066',
@@ -60,22 +59,59 @@ class ZeekPrompt:
             'tool':          'ansigreen',
             'prompt_symbol': 'ansiyellow'
         })
+
         message = [
             ('class:tool',          'zeek '),
             ('class:prompt_symbol', '❯ '),
         ]
-        self.completer = NestedCompleter.from_nested_dict({
-            'call' : {str(self.find_label_for_value(c1)) 
-                        if self.find_label_for_value(c1) != None else c1 : 
-                            {str(self.find_label_for_value(c2)) 
-                                if self.find_label_for_value(c2) != None else c2 : None 
-                                for c2 in self._zeek_env.get_commits_from_party()} 
-                        for c1 in self._zeek_env.get_commits_from_party()}, 
-            'party': {str(self.find_label_for_value(item)) 
-                        if self.find_label_for_value(item) != None 
-                        else item : None for item in self._zeek_env.get_parties()}
+
+        '''
+        A `NestedCompleter` is component of the `prompt_toolkit. An instance is a dictionary with the elements that should appear 
+        when certain commands are typed in the REPL.
+        - In the case of `call`, the secrets of the current party should appear twice. The second set of secrets
+        is a nested dictionary which is a value for each secret in the first completion.
+        - For `party`, the avaiable parties should be listed.
+        - Command `prove` is completed with two secrets as in a `call`.
+        - Command `send` can be completed as `secret` or `proof`. For the `secret` case, the secrets for the current party are 
+        shown first and the parties next, after the `to` syntax. For the `proof` case, similarly to the `secret` case, the proofs 
+        of the current party are shown, then the `to` syntax and then a list of the available parties.
+        '''
+        def _make_completer_dictionary(env, outter_list, inner_dict):
+            d = {str(env.find_label_for_value(v)) 
+                        if env.find_label_for_value(v) != None else v : inner_dict
+                        for v in outter_list}
+            sorted_keys = sorted(d, key=lambda x: (str(x)[0][0].isnumeric(), str(x)))
+            d = {k : d[k] for k in sorted_keys}
+            return d
+        
+        commits = self._zeek_env.get_commits_from_party()
+        proofs  = self._zeek_env.get_proofs_from_party()
+        parties = self._zeek_env.get_parties()
+        completer = NestedCompleter.from_nested_dict({
+            'call'  : _make_completer_dictionary(self, commits, _make_completer_dictionary(self, commits, None)), 
+            'check' : {'call' : _make_completer_dictionary(self, commits, 
+                                 _make_completer_dictionary(self, commits, 
+                                    {'returns' : {'t'   : {'in' : _make_completer_dictionary(self, proofs, None)},
+                                                  'nil' : {'in' : _make_completer_dictionary(self, proofs, None)}}}))},
+            'secrets'   : None,
+            'exit'  : None,
+            'hash'  : {'hide': None,
+                       'new party': None,
+                       'prove': _make_completer_dictionary(self, commits, _make_completer_dictionary(self, commits, None))},
+            'help'  : None,
+            'hide'  : None,
+            'labels': None,
+            'new party': None,
+            'parties': None,
+            'party' : _make_completer_dictionary(self, parties, None),
+            'prove' : _make_completer_dictionary(self, commits, _make_completer_dictionary(self, commits, {'as': None})), 
+            'save labels': None,
+            'send'  : {'secret': _make_completer_dictionary(self, commits, {'to' : _make_completer_dictionary(self, parties, None)}), 
+                       'proof':  _make_completer_dictionary(self, proofs,  {'to' : _make_completer_dictionary(self, parties, None)})},
+            'verify': _make_completer_dictionary(self, proofs, None)
         })
-        return self.session.prompt(message, style=style, completer=self.completer, rprompt=pt.HTML(self._right_prompt(self._zeek_env.get_party())))
+
+        return self.session.prompt(message, style=style, completer=completer, rprompt=pt.HTML(self._right_prompt(self._zeek_env.get_party())))
 
     def empty_labels(self):
         return self._labels == {}
