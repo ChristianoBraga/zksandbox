@@ -91,7 +91,7 @@ def _main(path):
                         print('Neither secrets nor proofs to print.')
                     if commits != []:
                         [_print_labeled_commit(zeek_prompt, c) if zeek_prompt.find_label_for_value(c) != None 
-                         else _print_unlabeled_commit(zeek_prompt, c) for c in commits][0]
+                         else _print_unlabeled_commit(c) for c in commits][0]
                     if proofs != []:
                         [_print_labeled_proof(zeek_prompt, p) if zeek_prompt.find_label_for_value(p) != None 
                          else _print_unlabeled_proof(p) for p in proofs][0]
@@ -308,7 +308,7 @@ if __name__ == '__main__':
         print()
         _main(f'{os.getcwd()}/.zeek')
     except Exception as e:
-        print(e)
+        print_formatted_text(HTML(f'<ansired>{e}</ansired>'))
         print(type(e))
         print(tb.print_exc())
         print('zeek internal error.')

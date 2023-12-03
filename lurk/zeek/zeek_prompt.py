@@ -86,11 +86,11 @@ class ZeekPrompt:
         
         commits = self._zeek_env.get_commits_from_party()
         proofs  = self._zeek_env.get_proofs_from_party()
-        parties = self._zeek_env.get_parties()
+        parties = [p for p in self._zeek_env.get_parties() if p != self.get_party()]
         completer = NestedCompleter.from_nested_dict({
             'call'  : _make_completer_dictionary(self, commits, _make_completer_dictionary(self, commits, None)), 
-            'check' : {'call' : _make_completer_dictionary(self, commits, 
-                                 _make_completer_dictionary(self, commits, 
+            'check' : {'call' : _make_completer_dictionary(self, self.get_labels(), 
+                                 _make_completer_dictionary(self, self.get_labels(), 
                                     {'returns' : {'t'   : {'in' : _make_completer_dictionary(self, proofs, None)},
                                                   'nil' : {'in' : _make_completer_dictionary(self, proofs, None)}}}))},
             'secrets'   : None,
