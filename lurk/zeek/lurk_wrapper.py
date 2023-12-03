@@ -33,6 +33,10 @@ class LurkWrapper:
         cmd = 'Hide', ['!(hide', f'{salt}'] + value + [')']
         return cmd
 
+    def _mk_open_cmd(value):
+        assert(value != None)
+        return 'Open', ['!(open', f'{value})']
+
     def _mk_apply_cmd(test, value):
         assert(test != None)
         assert(value != None)
@@ -82,6 +86,12 @@ class LurkWrapper:
         exit_idx = out.find('\nExiting...')
         return out[res_idx:exit_idx]
 
+    def _get_open_output(out):
+        assert(not LurkWrapper._has_error(out))
+        welcome_idx = out.find('you.\n') + len('you.\n') - 1
+        exit_idx = out.find('\nExiting...')
+        return out[welcome_idx+1:exit_idx].replace('FUNCTION', 'lambda').replace('.lurk.user.','')
+
     def _get_inspect_output(out):
         assert(not LurkWrapper._has_error(out))
         out_list = out.split()
@@ -119,7 +129,19 @@ class LurkWrapper:
         except Exception as e:
             print(e)
             raise LurkWrapperCommException(f'{cmd} failed.')
-        
+
+    def open(self, value):
+        try:
+            open_cmd = LurkWrapper._mk_open_cmd(value)
+            out = self._run(open_cmd[0], open_cmd[1])
+            if LurkWrapper._has_error(out):
+                return 1, LurkWrapper._get_error(out)
+            else:
+                return 0, LurkWrapper._get_open_output(out)
+        except Exception as e:
+            print(e)
+            raise LurkWrapperCommException('Open failed.')
+
     def hide(self, value):
         salt = rand.randint(10_000_000_000, 100_000_000_000)
         try:

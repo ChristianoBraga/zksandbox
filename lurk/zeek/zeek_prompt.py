@@ -105,6 +105,7 @@ class ZeekPrompt:
             'parties': None,
             'party' : _make_completer_dictionary(self, parties, None),
             'prove' : _make_completer_dictionary(self, commits, _make_completer_dictionary(self, commits, {'as': None})), 
+            'reveal': _make_completer_dictionary(self, commits, None),
             'save labels': None,
             'send'  : {'secret': _make_completer_dictionary(self, commits, {'to' : _make_completer_dictionary(self, parties, None)}), 
                        'proof':  _make_completer_dictionary(self, proofs,  {'to' : _make_completer_dictionary(self, parties, None)})},
@@ -176,7 +177,18 @@ class ZeekPrompt:
                 return 1, f'{e}\nUnexpected error while executing hide.'
         else:
             return 1, 'Only non-public parties may hide values.'
-    
+
+    def handle_open(self, value):
+        if not self.is_public():
+            try:
+                cd, pd = self._zeek_env.get_current_party_dirs()
+                lurkw = LurkWrapper(self._zeek_env.get_timeout(), cd, pd)
+                return lurkw.open(f'0x{value}')
+            except Exception as e:
+                return 1, f'{e}\nUnexpected error while executing open.'
+        else:
+            return 1, 'Only non-public parties may open values.'
+
     def handle_parties(self):
         if self.is_public():
             parties = self._zeek_env.get_parties()

@@ -160,6 +160,23 @@ def _main(path):
                             print(f'Label {label} already exists.')
                     else:
                         print('Only public can create a party.') 
+                case ['reveal', value_label]:
+                    if not zeek_prompt.is_public():
+                        value = _well_formed_argument(zeek_prompt, value_label)    
+                        if value == None: 
+                            print(f'Argument {value_label} is neither a label nor a hash.')
+                            continue
+                        if value not in zeek_prompt._zeek_env.get_commits_from_party():
+                            print(f'Current party ({zeek_prompt.get_party()}) does not own {value_label}.')
+                            continue
+                        rc, out = zeek_prompt.handle_open(value)
+                        print(out)
+                        if rc == 0:
+                            print('Reveal successful.')
+                        else:
+                            print('Reveal failed.')
+                    else:
+                        print('Public does not have secrets to reveal.')
                 case ['parties']:
                     rc, out = zeek_prompt.handle_parties()
                     if rc == 0:
